@@ -37,7 +37,7 @@ Since this is measured from the parent origin and the origin of the child sits a
 
 `a_1` is the distance between `Z_1` and `Z_2` (measured in `X_1` direction). `X_1` is pointing in x-direction in the urdf file, so the value for `a_1` is the difference in x direction between links 1 and 2, this would be 0.35.
 `a_2` is the distance between `Z_2` and `Z_3` along `X_2`. According to the drawing, `X_2` points upwards, which is the z-direction in the urdf file. Hence `a_2` is the height difference between joints 2 and 3, so `a_2` is 1.25.
-By similar reasoning, `a_3` is the height difference between joints 3 and 4, so `a_3 = 0.054` (negative, but according to the instructions we do not take the sign into account here).
+By similar reasoning, `a_3` is the height difference between joints 3 and 4, so `a_3 = -0.054`.
 
 Looking at `d_1` in the picture, we see that it is the height of the centre of joint 2. To get its value we have to add the relative z-coordinates of joints 1 and 2 and end up with `d_1 = 0.33 + 0.42 = 0.75`.
 `d_4` measures the offset between joints 3 and 5, so its value is `d_4 = 0.96 + 0.54 = 1.5`.
@@ -54,7 +54,7 @@ i | `alpha_{i-1}`|`a_{i-1}`| `d_i`| `theta_i`
 1|0|0|0.75|`d_1`
 2|-90°|0.35|0|`q_2`-90°
 3|0|1.25|0|`q_3`
-4|-90°|0.054|1.5|`q_4`
+4|-90°|-0.054|1.5|`q_4`
 5|90°|0|0|`q_5`
 6|-90°|0|0|`q_6`
 G|0|0|0.303| 0
