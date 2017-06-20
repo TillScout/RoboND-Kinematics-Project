@@ -59,17 +59,12 @@ i | `alpha_{i-1}`|`a_{i-1}`| `d_i`| `theta_i`
 6|-90°|0|0|`q_6`
 G|0|0|0.303| 0
 
-
-
-
 #### 2. Using the DH parameter table you derived earlier, create individual transformation matrices about each joint. In addition, also generate a generalized homogeneous transform between base_link and gripper_link using only end-effector(gripper) pose.
 
-Here's | A | Snappy | Table
---- | --- | --- | ---
-1 | `highlight` | **bold** | 7.41
-2 | a | b | c
-3 | *italic* | text | 403
-4 | 2 | 3 | abcd
+Individual transformation matrices about each joint are currently defined in the [FK_analysis.py file](kuka_arm/scriptts/FK_analysis.py) file
+#### TODO: move it here, add explanation
+
+The code to generate the homogeneous transform between base_link and gripper_link is found in the [hom_transform_gripper.py file](kuka_arm/scripts/hom_transform_gripper.py). What it does is take the roll, pitch and yaw information from the end-effector pose and multiply the respective rotation matrices in an extrinsic way. Then I took the cartesian location information from the pose and assembled everything into a homogeneous transform.
 
 #### 3. Decouple Inverse Kinematics problem into Inverse Position Kinematics and inverse Orientation Kinematics; doing so derive the equations to calculate all individual joint angles.
 
