@@ -77,6 +77,8 @@ T0_5 = simplify(T0_1 * T1_2 * T2_3 * T3_4 * T4_5)
 T0_6 = simplify(T0_1 * T1_2 * T2_3 * T3_4 * T4_5 * T5_6)
 T0_G = simplify(T0_1 * T1_2 * T2_3 * T3_4 * T4_5 * T5_6 * T6_G)
 
+# all of these return DH coordinate frames. Including T0_G: base/world z-axis is transformed to point in gripper direction!
+
 # correction matrix to transform gripper's coordinate frame into DH one.
 R_y = Matrix([[ cos(-np.pi/2),        0,  sin(-np.pi/2),    0],
               [       0,        1,        0,                0],
@@ -89,5 +91,5 @@ R_z = Matrix([[ cos(np.pi), -sin(np.pi),        0,  0],
               [ 0,              0,        0,        1]])
 R_corr = simplify(R_z * R_y)
 
-# total homogeneous transform:
+# total homogeneous transform (resulting in urdf coordinate frame!)
 T_total = simplify(T0_G * R_corr)

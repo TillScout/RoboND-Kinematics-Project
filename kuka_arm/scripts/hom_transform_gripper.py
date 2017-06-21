@@ -26,7 +26,7 @@ R_z = Matrix([[ cos(q3), -sin(q3),        0],
               [ sin(q3),  cos(q3),        0],
               [ 0,              0,        1]])
 
-# combine into extrinsic rotation 
+# combine into extrinsic rotation. This rotation is in urdf-coordinates
 R = simplify(R_z*R_y*R_x)
 
 # to get from pose informatio (location and orientation):
@@ -39,4 +39,4 @@ def transform(xx, yy, zz, r,p,y):
     T = R_e.row_join(loc)
     T = T.col_join(Matrix([[0,0,0,1]]))
     return T, R_e # return both for debugging purposes
-    
+
