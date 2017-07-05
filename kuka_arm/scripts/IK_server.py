@@ -93,6 +93,7 @@ T0_3 = simplify(T0_1 * T1_2 * T2_3)
 R0_3 = T0_3[0:3, 0:3]
 R0_3_inv = simplify(R0_3.inv())
 R3_G = simplify(T3_4 * T4_5 * T5_6 * T6_G)[0:3, 0:3]
+T0_G_sym = simplify(T0_1 * T1_2 * T2_3 * T3_4 * T4_5 * T5_6 * T6_G)
 
 # all of these return DH coordinate frames. Including T0_G: base/world z-axis is transformed to point in gripper direction!
 # correction matrix to transform gripper's coordinate frame into DH one.
@@ -172,18 +173,17 @@ def t23from1(WC, th1):
 def th456from123(R_Mat, th1, th2, th3):
     R3_G = R0_3_inv.evalf(subs={q1: th1, q2:th2, q3: th3}) * R_Mat
     theta5_predict = float(acos(R3_G[1,2])) # also the negative is a possibility!!!
-    if theta5_predict < 0.01: # might sometimes get errors in floating point operations when dividing small numbers later
+    if theta5_predict < 0.01: 
         # theta5 = 0 => 4 and 6 collinear, so only theta4+theta6 matters
         theta4_predict = - float(asin(R3_G[2,0]))
-        theta6_predict = 0
-        return [theta4_predict, theta5_predict, theta6_predict]
+        return [theta4_predict], [0], [0]
     else:
-        theta4_predict = float(acos(-R3_G[0,2]/sin(theta5_predict))) # if negative theta5 is chosen, this also gets a sign
-        theta6_predict = float(asin(-R3_G[1,1]/sin(theta5_predict))) # if negative tcheta5 is chosen, this also gets a sign
+        th4 = float(acos(-R3_G[0,2]/sin(theta5_predict))) # if negative theta5 is chosen, this also gets a sign
+        th6 = float(asin(-R3_G[1,1]/sin(theta5_predict))) # if negative theta5 is chosen, this also gets a sign
         # options in case of negative theta5:
-        theta4_predict_neg = [pi-theta4_predict, float(asin(-R3_G[2,2]/sin(theta5_predict)))]
-        theta6_predict_neg = [pi-theta6_predict, theta6_predict-pi/2]
-    return theta5_predict, theta4_predict, theta4_predict_neg, theta6_predict, theta6_predict_neg
+        theta4_predict = [th4, -th4, pi-th4, th4-pi]
+        theta6_predict = [th6, -th6, th6-pi/2, pi-th6]
+        return theta4_predict, [theta5_predict, -theta5_predict], theta6_predict
 
 
 def handle_calculate_IK(req):
@@ -209,8 +209,8 @@ def handle_calculate_IK(req):
             (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(
                 [req.poses[x].orientation.x, req.poses[x].orientation.y,
                     req.poses[x].orientation.z, req.poses[x].orientation.w])
-            print "position: ", round(px,6),",", round(py, 6),",", round(pz,6)
-            print "rpy: ", round(roll, 6),",", round(pitch, 6),",", round(yaw,6)
+            print "desired position: ", round(px,6),",", round(py, 6),",", round(pz,6)
+            print "desired rpy: ", round(roll, 6),",", round(pitch, 6),",", round(yaw,6)
     
             # to compute roll, pitch and yaw from a rotation matrix
             def rpy_from_matrix(matrix):
@@ -224,10 +224,10 @@ def handle_calculate_IK(req):
             def rpy_check(th, r=roll,p=pitch,y=yaw):
                 tol = 0.01
                 theta_subs = {q1: th[0], q2: th[1], q3: th[2], q4: th[3], q5: th[4], q6: th[5]}
-                T0_G = simplify(T0_1.subs(theta_subs) * T1_2.subs(theta_subs) * T2_3.subs(theta_subs) * T3_4.subs(theta_subs) * T4_5.subs(theta_subs) * T5_6.subs(theta_subs) * T6_G.subs(theta_subs))*T_corr
+                T0_G = T0_G_sym.evalf(subs=theta_subs)*T_corr
                 rr, pp, yy = rpy_from_matrix(T0_G)
                 ra, pa, ya = abs(r-rr), abs(p-pp), abs(y-yy)
-                return (ra < tol or abs(ra-pi) < tol)*(pa < tol or abs(pa-pi)<tol)*(ya < tol or abs(ya-pi)<tol)
+                return (ra < tol or abs(ra-2*pi) < tol) * (pa < tol or abs(pa-2*pi)<tol) * (ya < tol or abs(ya-2*pi)<tol)
 
     
             R_roll = Matrix([[ 1,              0,        0],
@@ -273,47 +273,29 @@ def handle_calculate_IK(req):
             
             ### theta4-6: ###
             # this only works for correctly predicted theta1!
-            # the theta4&6 computations are sometimes off by a factor of 2pi,
-            # this is due to the wide range of possible angles for
-            # those joints, should not be a problem.
             
-            # tie up all the choices and check whether they are within limits:
-
-            returned_angles = th456from123(R_EE*R_corr, theta1_predict, up[0], up[1])
-            if len(returned_angles) == 3:
-                angles = [theta1_predict]+up+returned_angles
-            else:
-                [theta5_predict, theta4_predict, theta4_predict_neg, theta6_predict, theta6_predict_neg] = returned_angles
-                up = [theta1_predict]+up
-                if rpy_check(up+[theta4_predict, theta5_predict, theta6_predict]):
-                    angles = up + [theta4_predict, theta5_predict, theta6_predict]
-                else:
-                    for th4 in theta4_predict_neg:
-                        for th6 in theta6_predict_neg:
-                            if rpy_check(up + [th4, -theta5_predict, th6]):
-                                angles = up + [th4, -theta5_predict, th6]
-                                break
-            
-            if not "angles" in locals():
-                returned_angles = th456from123(R_EE*R_corr, theta1_predict, down[0], down[1])
-                if len(returned_angles) == 3:
-                    angles = [theta1_predict]+down+returned_angles
-                else:
-                    theta5_predict, theta4_predict, theta4_predict_neg, theta6_predict, theta6_predict_neg = returned_angles
-                    down = [theta1_predict]+down
-                    if rpy_check(down+[theta4_predict, theta5_predict, theta6_predict]):
-                        angles = down + [theta4_predict, theta5_predict, theta6_predict]
+            # tie up all the choices and check whether they are within limits and solve the rpy-problem:
+            # not calculating the "down" option, as it never occured in the simulation
+            theta4_predict, theta5_predict, theta6_predict = th456from123(R_EE*R_corr, theta1_predict, up[0], up[1])
+            then = time()
+            for th5 in theta5_predict:
+                for th4 in theta4_predict:
+                    for th6 in theta6_predict:
+                        if rpy_check([theta1_predict]+up+[th4, th5, th6]):
+                            angles = [theta1_predict]+up+[th4, th5, th6]
+                            break
                     else:
-                        for th4 in theta4_predict_neg:
-                            for th6 in theta6_predict_neg:
-                                if rpy_check(down + [th4, -theta5_predict, th6]):
-                                    angles = down + [th4, -theta5_predict, th6]
-                                    break
-
+                        continue 
+                    break
+                else:
+                    continue
+                break
+            
+            
             if not "angles" in locals():
                 print "no angles found, error remaining"
                 
-            print "angles", angles
+            print "found angles: ", angles
                 
             # Populate response for the IK request
             # In the next line replace theta1,theta2...,theta6 by your joint angle variables
