@@ -277,7 +277,6 @@ def handle_calculate_IK(req):
             # tie up all the choices and check whether they are within limits and solve the rpy-problem:
             # not calculating the "down" option, as it never occured in the simulation
             theta4_predict, theta5_predict, theta6_predict = th456from123(R_EE*R_corr, theta1_predict, up[0], up[1])
-            then = time()
             for th5 in theta5_predict:
                 for th4 in theta4_predict:
                     for th6 in theta6_predict:
