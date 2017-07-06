@@ -122,9 +122,24 @@ This completes the inverse Kinematics problem.
 
 #### 1. Fill in the `IK_server.py` file with properly commented python code for calculating Inverse Kinematics based on previously performed Kinematic Analysis. Your code must guide the robot to successfully complete 8/10 pick and place cycles. Briefly discuss the code you implemented and your results.
 
+For coding it up, I tried to keep as much of the computation heavy symbolic calculations out of the main loop. All the setup of symbolic matrices (the homogeneous transforms) is outside the main loop, i.e. before the ROS-node is created.
 
-Here I'll talk about the code, what techniques I used, what worked and why, where the implementation might fail and how I might improve it if I were going to pursue this project further.  
+Also outside the main loop I compute some of the values that I will need during the calculation, like the distance between joint 3 and the WC (which is independent of the thetas).
 
+Then I define a function `t23from1`, that computes the possibilites for thetas 2 and 3 from a given theta1. This function uses the method described above to compute two options for thetas 2 and 3, that I call the "up" and "down" options because of the pose of joint 3. In the end I noticed that the simulator never gets into a "down" position, so I removed my decision routine for that.
 
-And just for fun, another example image:
-![alt text][image3]
+Next the function `th456from123` computes thetas 4-6 from a given set of thetas1-3. It returns arrays with all the options for the angles that we get due to ambiguities of the asin and acos functions. This is then evaluated inside the main loop.
+
+In the main loop I created two helper functions, one to compute roll, pitch and yaw from a given rotation matrix and one to check whether a given set of angles satisfies the required roll, pitch and yaw conditions.
+
+Next up is the calculation of WC location and then the prediction of theta1. I ignored the ambiguity described above, since this never occured in the situation.
+
+Then I use the `t23from1` function to find the options for thetas 2 and 3 and check which of them is within the limits for the joints.
+
+And finally I compute all the possibilies for angles theta 4-6 and then iterate over them to check which option returns the desired pose.
+
+##### Regarding possibilities for improvement:
+
+The code is slow to set up because of the symbolic computations in the beginning, that are especially required in the final step to identify which angles return the correct pose. This could be a lot faster if replacing the symbolic calculations with actual values in the main loop, i.e. using numpy instead of sympy.
+
+Another possibility for improvement is the decision making routine that chooses which values for the thetas to return. Currently it is a slow iteration and checking if the given angles return the required pose. This could be speeded up a little with some tuning, but I think the best way would be to find a new way to directly compute the proper theta values without having to do the choices. As mentioned above, I could not find a way using the atan2 function like some people on Slack did. But it could also be a possibility to exploit some more of the constraints of the R3_G matrix.
