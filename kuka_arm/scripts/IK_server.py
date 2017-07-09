@@ -10,6 +10,8 @@
 # Author: Harsh Pandya
 
 # import modules
+
+print "starting..."
 import rospy
 import tf
 from kuka_arm.srv import *
@@ -21,6 +23,7 @@ from sympy.matrices import Matrix
 import numpy as np
 pi = np.pi
 
+print "setting up symbols and variables"
 ### Create symbols for joint variables
 q1, q2, q3, q4, q5, q6, q7 = symbols('q1:8') # thetas
 d1, d2, d3, d4, d5, d6, d7 = symbols('d1:8')
@@ -46,12 +49,13 @@ s = {alpha0: 0,     a0:     0,  d1: 0.75,
      alpha6: 0,     a6: 0,      d7: 0.303, q7: 0}
 
 #### Homogeneous Transforms around each individual joint
+print "setting up matrices"
 T0_1 = Matrix([[             cos(q1),            -sin(q1),            0,              a0],
                [ sin(q1)*cos(alpha0), cos(q1)*cos(alpha0), -sin(alpha0), -sin(alpha0)*d1],
                [ sin(q1)*sin(alpha0), cos(q1)*sin(alpha0),  cos(alpha0),  cos(alpha0)*d1],
                [                   0,                   0,            0,               1]])
 T0_1 = T0_1.subs(s)
-
+"""
 T1_2 = Matrix([[             cos(q2),            -sin(q2),            0,              a1],
                [ sin(q2)*cos(alpha1), cos(q2)*cos(alpha1), -sin(alpha1), -sin(alpha1)*d2],
                [ sin(q2)*sin(alpha1), cos(q2)*sin(alpha1),  cos(alpha1),  cos(alpha1)*d2],
@@ -87,13 +91,31 @@ T6_G = Matrix([[             cos(q7),            -sin(q7),            0,        
                [ sin(q7)*sin(alpha6), cos(q7)*sin(alpha6),  cos(alpha6),  cos(alpha6)*d7],
                [                   0,                   0,            0,               1]])
 T6_G = T6_G.subs(s)
-
+"""
 # to solve orientation problem:
-T0_3 = simplify(T0_1 * T1_2 * T2_3)
-R0_3 = T0_3[0:3, 0:3]
-R0_3_inv = simplify(R0_3.inv())
-R3_G = simplify(T3_4 * T4_5 * T5_6 * T6_G)[0:3, 0:3]
-T0_G_sym = simplify(T0_1 * T1_2 * T2_3 * T3_4 * T4_5 * T5_6 * T6_G)
+T0_3_sym = Matrix([
+[1.0*sin(q2 + q3)*cos(q1), 1.0*cos(q1)*cos(q2 + q3),         -1.0*sin(q1), (1.25*sin(q2) + 0.35)*cos(q1)],
+[1.0*sin(q1)*sin(q2 + q3), 1.0*sin(q1)*cos(q2 + q3),          1.0*cos(q1), (1.25*sin(q2) + 0.35)*sin(q1)],
+[        1.0*cos(q2 + q3),        -1.0*sin(q2 + q3), 6.12323399573677e-17,           1.25*cos(q2) + 0.75],
+[                       0,                        0,                    0,                             1]])
+
+
+R0_3 = T0_3_sym[0:3, 0:3]
+R0_3_inv = Matrix([
+[1.0*sin(q2 + q3)*cos(q1), 1.0*sin(q1)*sin(q2 + q3),  1.0*cos(q2 + q3)],
+[1.0*cos(q1)*cos(q2 + q3), 1.0*sin(q1)*cos(q2 + q3), -1.0*sin(q2 + q3)],
+[            -1.0*sin(q1),              1.0*cos(q1),                 0]])
+    
+R3_G = Matrix([
+[-1.0*sin(q4)*sin(q6) + 1.0*cos(q4)*cos(q5)*cos(q6), -1.0*sin(q4)*cos(q6) - 1.0*sin(q6)*cos(q4)*cos(q5), -1.0*sin(q5)*cos(q4)],
+[                               1.0*sin(q5)*cos(q6),                               -1.0*sin(q5)*sin(q6),          1.0*cos(q5)],
+[-1.0*sin(q4)*cos(q5)*cos(q6) - 1.0*sin(q6)*cos(q4),  1.0*sin(q4)*sin(q6)*cos(q5) - 1.0*cos(q4)*cos(q6),  1.0*sin(q4)*sin(q5)]])
+    
+T3_G_sym = Matrix([
+[-1.0*sin(q4)*sin(q6) + 1.0*cos(q4)*cos(q5)*cos(q6), -1.0*sin(q4)*cos(q6) - 1.0*sin(q6)*cos(q4)*cos(q5), -1.0*sin(q5)*cos(q4), -0.303*sin(q5)*cos(q4) - 0.054],
+[                               1.0*sin(q5)*cos(q6),                               -1.0*sin(q5)*sin(q6),          1.0*cos(q5),            0.303*cos(q5) + 1.5],
+[-1.0*sin(q4)*cos(q5)*cos(q6) - 1.0*sin(q6)*cos(q4),  1.0*sin(q4)*sin(q6)*cos(q5) - 1.0*cos(q4)*cos(q6),  1.0*sin(q4)*sin(q5),          0.303*sin(q4)*sin(q5)],
+[                                                 0,                                                  0,                    0,                              1]])
 
 # all of these return DH coordinate frames. Including T0_G: base/world z-axis is transformed to point in gripper direction!
 # correction matrix to transform gripper's coordinate frame into DH one.
@@ -128,12 +150,13 @@ j4_wc = 0.54
 theta3_off_angle_up = 1.5348118667128452 
 theta3_off_angle_down = -4.7483734404667421
 
+print "setting up functions"
 # function to get thetas 2&3 from theta1:
 def t23from1(WC, th1):
     
     [wc_x, wc_y, wc_z] = WC
     # calculate the position of joint 2:
-    j2_x, j2_y, j2_z, _ = T0_1.evalf(subs={q1:th1}) * T1_2.col(-1)
+    j2_x, j2_y, j2_z, _ = T0_1.evalf(subs={q1:th1}) * Matrix([[0.35],[   0],[   0],[   1]])
 
     # distance between joint2 and WC
     wc_j2 = (Matrix([j2_x, j2_y, j2_z]) - Matrix([wc_x, wc_y, wc_z])).norm()
@@ -221,10 +244,10 @@ def handle_calculate_IK(req):
                 return rr, pp, yy
             
             # to check wether given angles produce the desired roll pitch and yaw, required for handling theta-choices
-            def rpy_check(th, r=roll,p=pitch,y=yaw):
+            def rpy456_check(Mat, th456, r=roll,p=pitch,y=yaw):
                 tol = 0.01
-                theta_subs = {q1: th[0], q2: th[1], q3: th[2], q4: th[3], q5: th[4], q6: th[5]}
-                T0_G = T0_G_sym.evalf(subs=theta_subs)*T_corr
+                theta_subs = {q4: th456[0], q5: th456[1], q6: th456[2]}
+                T0_G = Mat*T3_G_sym.evalf(subs=theta_subs)*T_corr
                 rr, pp, yy = rpy_from_matrix(T0_G)
                 ra, pa, ya = abs(r-rr), abs(p-pp), abs(y-yy)
                 return (ra < tol or abs(ra-2*pi) < tol) * (pa < tol or abs(pa-2*pi)<tol) * (ya < tol or abs(ya-2*pi)<tol)
@@ -273,14 +296,14 @@ def handle_calculate_IK(req):
             
             ### theta4-6: ###
             # this only works for correctly predicted theta1!
-            
+            T0_3_num = T0_3_sym.evalf(subs={q1:theta1_predict, q2: up[0], q3:up[1]})
             # tie up all the choices and check whether they are within limits and solve the rpy-problem:
             # not calculating the "down" option, as it never occured in the simulation
             theta4_predict, theta5_predict, theta6_predict = th456from123(R_EE*R_corr, theta1_predict, up[0], up[1])
             for th5 in theta5_predict:
                 for th4 in theta4_predict:
                     for th6 in theta6_predict:
-                        if rpy_check([theta1_predict]+up+[th4, th5, th6]):
+                        if rpy456_check(T0_3_num,[th4, th5, th6]):
                             angles = [theta1_predict]+up+[th4, th5, th6]
                             break
                     else:
